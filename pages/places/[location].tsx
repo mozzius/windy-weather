@@ -1,18 +1,32 @@
+import { format } from "date-fns";
 import type {
   GetServerSidePropsContext,
   InferGetServerSidePropsType,
   NextPage,
 } from "next";
+import type { LocationRoute } from "../api/location/[location]";
 import { getWeather } from "../api/weather";
 
 const Location: NextPage<
   InferGetServerSidePropsType<typeof getServerSideProps>
-> = ({ location }) => {
+> = ({ locations, weather, error }) => {
+  if (error || !weather || !locations) {
+    return <p>Error: {error}</p>;
+  }
+
+  const location = locations[0]
+
+  console.log(location)
+
   return (
     <div>
-      <h1>{location}</h1>
-      <pre>{JSON.stringify(location, undefined, 2)}</pre>
-      <pre>{JSON.stringify(location, undefined, 2)}</pre>
+      <h1>{location.local_names?.en ?? location.name }</h1>
+      {weather.list.map((item) => (
+        <div key={item.dt}>
+          <p>{format(new Date(item.dt_txt), "dd/MM/yyyy HH:MM")}</p>
+          <p>{item.main.temp}°C</p>
+        </div>
+      ))}
     </div>
   );
 };
@@ -26,26 +40,33 @@ export const getServerSideProps = async ({
     "public, s-maxage=60, stale-while-revalidate=600"
   );
 
-  const { location } = query;
+  const { location: locationQuery } = query;
 
   // aggressively cached
   const locRes = await fetch(
-    `https://windy-weather.vercel.app/api/location/${location}`
+    `${
+      process.env.NODE_ENV === "development"
+        ? "http://localhost:3000"
+        : "https://windy-weather.vercel.app"
+    }/api/location/${locationQuery}`
   );
-  const fullLocation = await locRes.json();
+  const locations: LocationRoute = await locRes.json();
 
-  if (fullLocation.length === 0) {
+  if (locations.length === 0) {
     return {
       props: {
-        location: [],
         error: "Location not found",
+        locations: null,
+        weather: null,
       },
     };
   }
 
-  // const weather = getWeather(fullLocation[0]);
+  const { lat, lon } = locations[0];
 
-  return { props: { location: fullLocation, error: null } };
+  const weather = await getWeather(lat, lon);
+
+  return { props: { locations, weather, error: null } };
 };
 
 export default Location;
