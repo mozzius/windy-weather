@@ -17,10 +17,16 @@ const Location: NextPage<
   );
 };
 
-export const getServerSideProps = async (
-  context: GetServerSidePropsContext
-) => {
-  const { location } = context.query;
+export const getServerSideProps = async ({
+  res,
+  query,
+}: GetServerSidePropsContext) => {
+  res.setHeader(
+    "Cache-Control",
+    "public, s-maxage=60, stale-while-revalidate=600"
+  );
+
+  const { location } = query;
 
   // aggressively cached
   const locRes = await fetch(
